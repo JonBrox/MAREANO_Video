@@ -1,14 +1,11 @@
 ---
-title: "AllVideo_HMSC_PrepData"
+title: "Video_DataPrep"
 output: html_document
 date: "`r format(Sys.time(), '%d %B, %Y')`"
 ---
 
 # PACKAGES
 ```{r, message=FALSE, warning=FALSE}
-
-#https://discourse.mc-stan.org/t/brms-installation-problems-on-ubuntu-22-04-1-lts/30084 
-
 library(dplyr)
 library(vegan)
 library(openxlsx)
@@ -26,7 +23,11 @@ library(readxl)
 library(raster)
 set.seed(6)
 
-source("/gpfs/gpfs0/home/home2/a39495/MY_TaxonomicFromWormsDF.r")
+PathScripts<-"C:/Users/a39495/Havforskningsinstituttet/MAREANO Biotope modelling - VideoData/Scripts/"
+PathInputData<-"C:/Users/a39495/Havforskningsinstituttet/MAREANO Biotope modelling - VideoData/Input/"
+PathOutput<- "C:/Users/a39495/Havforskningsinstituttet/MAREANO Biotope modelling - VideoData/Output/"
+
+source(paste0(PathScripts, "MY_TaxonomicFromWormsDF.r"))
 ```
 
 # MCMC options
@@ -37,7 +38,7 @@ MinSightings<- 20
 
 # Land geography
 ```{r}
-load("~/worldMap.rda")
+load(paste0(PathInputData,"worldMap.rda"))
 ggworldMap<-fortify(worldMap)
 ```
 
@@ -45,7 +46,7 @@ ggworldMap<-fortify(worldMap)
 VME species:
 # I add this to make sure VME species are kepts even if they are below "MinSightings"
 ```{r}
-source("/gpfs/gpfs0/home/home2/a39495/VME_Spp.R")
+source(paste0(PathScripts, "VME_Spp.r"))
 ```
 
 # LOAD DATA
@@ -54,8 +55,8 @@ source("/gpfs/gpfs0/home/home2/a39495/VME_Spp.R")
 Loads trawling data
 ```{r, warning=FALSE}
 if(FALSE){
-FishingEffort<-read.csv("/gpfs/gpfs0/home/home2/a39495/Input/effort_fish.csv", sep = ",")
-ShrimpingEffort<-read.csv("/gpfs/gpfs0/home/home2/a39495/Input/effort_shrimp.csv", sep = ",")
+FishingEffort<-read.csv(paste0(PathInputData,"effort_fish.csv"), sep = ",")
+ShrimpingEffort<-read.csv(paste0(PathInputData,"effort_shrimp.csv"), sep = ",")
 
 FishingEffort[log(FishingEffort$Val_meankwHour+1)<5,'RelativeEffort']<-0
 FishingEffort[log(FishingEffort$Val_meankwHour+1)>=5 & log(FishingEffort$Val_meankwHour+1) <8.7,'RelativeEffort']<-1
@@ -87,16 +88,16 @@ rHarvestEffort <- projectRaster(rHarvestEffort, crs = "+proj=utm +ellps=WGS84 +z
 rHarvestEffort@data@values<-round(rHarvestEffort@data@values)
 plot(rHarvestEffort)
 }
-load("/gpfs/gpfs0/home/home2/a39495/Input/rHarvestEffort_raster.rda") # loads rHarvestEffort
+load(paste0(PathInputData,"rHarvestEffort_raster.rda")) # loads rHarvestEffort
 ```
 
 ## -Env
 ```{r, warning=FALSE}
-env_orig <- read.csv("/gpfs/gpfs0/home/home2/a39495/Input/2024/envData_2023-07-21.csv") %>% as.data.frame
+env_orig <- read.csv(paste0(PathInputData,"envData_2023-07-21.csv")) %>% as.data.frame
 env_orig<-unique(env_orig)
 env_orig[sapply(env_orig, is.character)] <- lapply(env_orig[sapply(env_orig, is.character)], as.factor)
 
-samp_info <- read.csv("/gpfs/gpfs0/home/home2/a39495/Input/2024/sample_info.csv") %>% as.data.frame
+samp_info <- read.csv(paste0(PathInputData,"sample_info.csv")) %>% as.data.frame
 samp_info<-samp_info[!(duplicated(samp_info$SampID)),]
 env_orig<-merge(env_orig, samp_info, by = "SampID", all.x = TRUE)
 
@@ -106,14 +107,14 @@ env_orig <- env_orig %>% dplyr::select(-c(spd_std, slope9, BO22_lightbotltmax_bd
 
 ## -Bio
 ```{r, warning=FALSE}
-otu_orig <- read.csv("/gpfs/gpfs0/home/home2/a39495/Input/2024/species_densities.csv") %>% as.data.frame
+otu_orig <- read.csv(paste0(PathInputData,"species_densities.csv")) %>% as.data.frame
 otu_orig <- dcast(otu_orig, SampID ~ clean_taxonomy, value.var="density_n100m2")
 otu_orig[is.na(otu_orig)]<-0
 ```
 
 ## - Taxon
 ```{r, warning=FALSE}
-Taxonary<-read.xlsx("~/Input/2024/Taxonary_2023-11-20.xlsx", sheet = 1)
+Taxonary<-read.xlsx(paste0(PathInputData,"Taxonary_2023-11-20.xlsx"), sheet = 1)
 Taxonary$Reference.List2 <-gsub(";", ".", Taxonary$Reference_List)
 Taxonary$Reference.List2 <-gsub("[ /]", "_", Taxonary$Reference.List2)
 ```
@@ -193,7 +194,6 @@ otuCompl<-otuCompl[,-which(colnames(otuCompl) %in% c("SampID2",
                                                      "Cup coral", # This one gets lost in the taxonomic functions because it is not associated to any toxonomic valid name
                                                      "Polychaeta", 
                                                      "Porifera",
-#                                                     "Neptunea sp.",
                                                      "Hydrozoa", 
                                                      "Ascidiacea"))]
 
@@ -203,7 +203,6 @@ otuCompl<-otuCompl[,-which(colnames(otuCompl) %in% c("SampID2",
 # otu_sp<- ifelse(str_sub(colnames(otu),-3,-1) == "sp." , str_sub(colnames(otu), -str_length(colnames(otu)),-5), colnames(otu))
 # Taxonary[which(Taxonary$Reference.List3 %in% otu_sp),]
 
-
  # XXX <-gsub("[ ;]", " ", colnames(otuCompl))
  # XXX <-gsub("[.]", "", XXX)
 ```
@@ -212,7 +211,7 @@ Results in a data set that contains information on which species could be summed
 
 ```{r}
 #Takes otuCompl
-source("/gpfs/gpfs0/home/home2/a39495/TaxonomicGroupings.r") 
+source(paste0(PathScripts,"TaxonomicGroupings.r")) 
 # Gives Taxonomic_DF_Groups
 levels(Taxonomic_DF_Groups$Species)[levels(Taxonomic_DF_Groups$Species) == "Echinoidea irregular"] <- "Irregularia"
 levels(Taxonomic_DF_Groups$Species)[levels(Taxonomic_DF_Groups$Species) == "Echinoidea regular"] <- "Carinacea"
@@ -461,18 +460,17 @@ legend("topleft",
        lwd=2, #sets line weight
        xpd=TRUE) #places outside plot area
 
-
-save(Taxonomic_phylo, file = paste0("/gpfs/gpfs0/home/home2/a39495/temp/Taxonomic_phylo_",SPLIT,".rda"))
-save(Branch_col, file = paste0("/gpfs/gpfs0/home/home2/a39495/temp/Branch_col_",SPLIT,".rda"))
-save(Taxonomic_DF, file = paste0("/gpfs/gpfs0/home/home2/a39495/temp/Taxonomic_DF",SPLIT,".rda"))
+save(Taxonomic_phylo, file = paste0(PathOutput,"Taxonomic_phylo_",SPLIT,".rda"))
+save(Branch_col, file = paste0(PathOutput,"Branch_col_",SPLIT,".rda"))
+save(Taxonomic_DF, file = paste0(PathOutput,"Taxonomic_DF",SPLIT,".rda"))
 
 ```
 
 
 ```{r}
 
-save(otu, file = paste0("otu_Video_",SPLIT,".rda"))
-save(env, file = paste0("env_Video_",SPLIT,".rda"))
+save(otu, file = paste0(PathOutput,"otu_Video_",SPLIT,".rda"))
+save(env, file =paste0(PathOutput,"env_Video_",SPLIT,".rda"))
 ```
 
 
