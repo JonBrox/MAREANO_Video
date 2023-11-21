@@ -3,7 +3,7 @@ colnames(otuCompl) <-gsub("[ /]", "_", colnames(otuCompl))
 otuSel <- otuCompl[,c(FALSE, colSums(otuCompl[,-c(1)] >0)>0)]
 
 # Get Aphia id numbers for all
-source("/gpfs/gpfs0/home/home2/a39495/TaxonarySp_to_AphiaID.R")
+source(paste0(PathScripts,"TaxonarySp_to_AphiaID.r"))
 AphiaIDs<-SpAphia_df[,5]
 Taxonomic_DF<-Aphia2TaxoTree(as.numeric(AphiaIDs))
 Taxonomic_DF<-as.data.frame(Taxonomic_DF)

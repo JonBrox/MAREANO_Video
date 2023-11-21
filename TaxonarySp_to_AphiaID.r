@@ -112,9 +112,7 @@ for(i in 1:nrow(SpAphia_m)){
   }
 }
 
-
 SpAphia_df<-data.frame(SpAphia_m)
-SpAphia_df<- SpAphia_df[SpAphia_df$V1 != "White",]
 SpAphia_df$Aphias<-as.numeric(paste(SpAphia_df$Aphias))
 
 
