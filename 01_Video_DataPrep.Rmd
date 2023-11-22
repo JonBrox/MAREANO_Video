@@ -27,14 +27,7 @@ PathScripts<-paste0("C:/Users/",HI_user,"/Havforskningsinstituttet/MAREANO Bioto
 PathInputData<-paste0("C:/Users/",HI_user,"/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Input/")
 PathOutput<-paste0("C:/Users/",HI_user,"/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Output/")
 PathTaxonary<- paste0("C:/Users/",HI_user,"/Havforskningsinstituttet/Video analysis lab - Reference List/Taxonary.xlsx")
-source(paste0(PathScripts, "MY_TaxonomicFromWormsDF.r"))
-source(paste0(PathScripts, "VME_Spp.r")) # I add this to make sure VME species are kepts even if they are below "MinSightings"
-# #=======
-# PathScripts<-"C:/Users/a39495/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Scripts/"
-# PathInputData<-"C:/Users/a39495/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Input/"
-# PathOutput<- "C:/Users/a39495/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Output/"
 
-#source(paste0(PathScripts, "MY_TaxonomicFromWormsDF.r"))
 source("MY_TaxonomicFromWormsDF.r")
 source("VME_Spp.r")
 
