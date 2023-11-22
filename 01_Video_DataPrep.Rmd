@@ -118,7 +118,7 @@ otu_orig<-otu_orig[,c(TRUE, colnames(otu_orig)[-1] %in% Taxonary[
     Taxonary$Specificity<4 & 
     Taxonary$Object_type == "Organism" & 
     Taxonary$Ecosystem_section != "Pelagic" &
-    !(Taxonary$Grouping_taxon_biotope %in% c("Algae", "Bacteria", "Biota","Other worms", "Foraminifera"))  ,'Reference_List'])]
+    !(Taxonary$Grouping_taxon_biotope %in% c("Algae", "Bacteria", "Biota", "Foraminifera"))  ,'Reference_List'])]
 ```
 
 # JOIN DATASETS 
