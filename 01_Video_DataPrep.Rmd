@@ -26,6 +26,13 @@ PathOutput<- "C:/Users/a39495/Havforskningsinstituttet/MAREANO Biotope modelling
 PathTaxonary<-"C:/Users/a39495/Havforskningsinstituttet/Video analysis lab - Reference List/Taxonary.xlsx"
 source(paste0(PathScripts, "MY_TaxonomicFromWormsDF.r"))
 source(paste0(PathScripts, "VME_Spp.r")) # I add this to make sure VME species are kepts even if they are below "MinSightings"
+#=======
+PathScripts<-"C:/Users/a21448/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Scripts/"
+PathInputData<-"C:/Users/a21448/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Input/"
+PathOutput<- "C:/Users/a21448/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Output/"
+
+#source(paste0(PathScripts, "MY_TaxonomicFromWormsDF.r"))
+source("MY_TaxonomicFromWormsDF.r")
 ```
 
 # MCMC options
