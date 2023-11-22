@@ -23,11 +23,12 @@ library(readxl)
 library(raster)
 set.seed(6)
 
-PathScripts<-"C:/Users/a39495/Havforskningsinstituttet/MAREANO Biotope modelling - VideoData/Scripts/"
-PathInputData<-"C:/Users/a39495/Havforskningsinstituttet/MAREANO Biotope modelling - VideoData/Input/"
-PathOutput<- "C:/Users/a39495/Havforskningsinstituttet/MAREANO Biotope modelling - VideoData/Output/"
+PathScripts<-"C:/Users/a21448/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Scripts/"
+PathInputData<-"C:/Users/a21448/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Input/"
+PathOutput<- "C:/Users/a21448/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Output/"
 
-source(paste0(PathScripts, "MY_TaxonomicFromWormsDF.r"))
+#source(paste0(PathScripts, "MY_TaxonomicFromWormsDF.r"))
+source("MY_TaxonomicFromWormsDF.r")
 ```
 
 # MCMC options
