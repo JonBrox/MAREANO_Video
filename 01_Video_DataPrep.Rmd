@@ -6,21 +6,20 @@ date: "`r format(Sys.time(), '%d %B, %Y')`"
 
 # PACKAGES
 ```{r, message=FALSE, warning=FALSE}
- library(dplyr)
- library(openxlsx)
- library(ggplot2)
- library(psych)
- library(stringr)
- library(pals)
- library(oce) # To estimate water density
- library(reshape2)
+library(dplyr)
+library(openxlsx)
+library(ggplot2)
+library(psych)
+library(stringr)
+library(pals)
+library(oce) # To estimate water density
+library(reshape2)
 
 set.seed(6) # At one point I "randomly "chose" stations within some Rstations. This makes sure that the random selection stays equal to allow replicability among us. 
 ```
 
 # PATHS and other funcitons
 ```{r, message=FALSE, warning=FALSE}
-
 HI_user<-"a39495"
 
 PathScripts<-paste0("C:/Users/",HI_user,"/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Scripts/")
@@ -139,8 +138,8 @@ joinedDat<-joinedDat[joinedDat$SegLengthM>190 & joinedDat$SegLengthM < 300,]
 joinedDat<-joinedDat[is.na(joinedDat$no_vision) | rowSums(joinedDat[,c('no_vision','poor_vision')], na.rm = TRUE) <0.5 | is.na(joinedDat$poor_vision),]
 joinedDat<-joinedDat[joinedDat$cruise_no != "2006612",]
 
-#Removes sites too close to each other
-joinedDat<-joinedDat[!(joinedDat$VL %in% c('779', '624','1222', '2113', '927','183','1888','2099','623', '1951','161','2136', '785', '1940', '2172', '1869', '2173','166', '578','821' )),]
+#Removes sites too close to each other with huge species variation
+joinedDat<-joinedDat[!(joinedDat$VL %in% c('779', '624','1222', '2113', '927','183','1888','2099','623', '1951','161','2136', '785', '1940', '2172', '1869', '2173','166', '578','821')),]
 ```
 
 # SEPARATE 
@@ -152,8 +151,11 @@ joinedDat<-joinedDat %>%
   dplyr::slice_sample(n=1) %>%
   ungroup()
 
+joinedDat$SampID<-joinedDat$SampID2
+joinedDat<-joinedDat[,-which(colnames(joinedDat) %in% c("SampID2"))]
+
 #replaces hard coded column selection
-otu_sort<- joinedDat %>% dplyr::select(c(1,which(colnames(joinedDat)== "SampID2"), 2:which(colnames(joinedDat)==names(otu_orig)[ncol(otu_orig)])))
+otu_sort<- joinedDat %>% dplyr::select(c(1,which(colnames(joinedDat)== "SampID"), 2:which(colnames(joinedDat)==names(otu_orig)[ncol(otu_orig)])))
 env_sort<-joinedDat %>% dplyr::select(c(1, (which(colnames(joinedDat)==names(otu_orig)[ncol(otu_orig)])+1):ncol(joinedDat)))
 ```
 
@@ -174,8 +176,7 @@ otuCompl<-otuCompl %>% select_if(~ !is.numeric(.) || sum(.) != 0)
 Remove  otu
 ```{r}
 #Remove species
-otuCompl<-otuCompl[,-which(colnames(otuCompl) %in% c("SampID2", 
-                                                     "Polychaeta errantia",
+otuCompl<-otuCompl[,-which(colnames(otuCompl) %in% c("Polychaeta errantia",
                                                      "Polychaeta fishingnet", 
                                                      "Polychaeta sediment tube", 
                                                      "Polychaeta question mark",
@@ -184,14 +185,15 @@ otuCompl<-otuCompl[,-which(colnames(otuCompl) %in% c("SampID2",
                                                      "Polychaeta soft thin tube",
                                                      "Polychaeta tube",
                                                      "Cup coral"#, # This one gets lost in the taxonomic functions because it is not associated to any toxonomic valid name
-                                                     ))]
+))]
+
 
 # Taxonary$Reference.List3<- ifelse(str_sub(Taxonary$Reference.List2,-3,-1) == "sp." , str_sub(Taxonary$Reference.List2, -str_length(Taxonary$Reference.List2),-5), Taxonary$Reference.List2)
 # otu_sp<- ifelse(str_sub(colnames(otu),-3,-1) == "sp." , str_sub(colnames(otu), -str_length(colnames(otu)),-5), colnames(otu))
 # Taxonary[which(Taxonary$Reference.List3 %in% otu_sp),]
 
- # XXX <-gsub("[ ;]", " ", colnames(otuCompl))
- # XXX <-gsub("[.]", "", XXX)
+# XXX <-gsub("[ ;]", " ", colnames(otuCompl))
+# XXX <-gsub("[.]", "", XXX)
 ```
 
 Results in a data set that contains information on which species could be summed with otus of coarser resolution. This is done to improve predictions of those coarser resolution otus, which in turn might help improve prediction strength on the finer resolutions
@@ -223,7 +225,7 @@ for(i in 2:ncol(otuCompl)){
   }else{
     if(TargetSp == "Echinoidea_regular"){TargetSp<-"Carinacea"}
     if(TargetSp == "Echinoidea_irregular"){TargetSp<-"Irregularia"}
-
+    
     XXX<-Taxonomic_DF_Groups %>% dplyr::select(which(colnames(Taxonomic_DF_Groups) == "Species"):ncol(Taxonomic_DF_Groups)) %>% filter_all(any_vars(. %in% c(TargetSp)))
   }
   
@@ -257,7 +259,7 @@ Taxonary[Taxonary$Reference_List %in% c("Porifera white bush"), 'Analysis_name']
 Taxonary[Taxonary$Reference_List %in% c("Porifera fan;big","Porifera fan;white", "Porifera fan;small","Plicatellopsis bowerbanki"), 'Analysis_name']<-"Porifera fan"
 Taxonary[Taxonary$Reference_List %in% c("Primnoa resedaeformis;impacted"), 'Analysis_name']<-"Primnoa resedaeformis" 
 Taxonary[Taxonary$Reference_List %in% c("Paragorgia arborea;impacted"), 'Analysis_name']<-"Paragorgia arborea"
- 
+
 FixThese<-c("Porifera encrusting","Porifera medium" ,"Porifera small","Porifera small round","Porifera small;stalked","Porifera small;stalked","Porifera erect","Porifera branched","Polymastiidae","Porifera fan","Primnoa resedaeformis" ,"Paragorgia arborea")
 
 for(i in 1:length(FixThese)){
@@ -292,8 +294,8 @@ otuCompl<-otuCompl[,which(!(colnames(otuCompl) %in% c("Actiniaria.red","Actiniar
 
 
 Subsets based on thresholds:
-  -Species with a minimum number of occurrences
-  -Stations with the minimum number of species and 
+-Species with a minimum number of occurrences
+-Stations with the minimum number of species and 
 ```{r}
 # Removes species with less than "MinSightings" that are not VMEs
 Sp_sel <- c(TRUE, colSums(otuCompl[, -c(1)]>0) > MinSightings)
@@ -305,9 +307,9 @@ otuSel <- otuCompl[stations_sel, Sp_sel]
 envSel <- envCompl[stations_sel, ]
 
 envSel$swDensRob_avs<-swRho(salinity=envSel$Smean_Robinson,
-                              temperature=envSel$Tmean_Robinson,
-                              pressure=(envSel$bathy*-1),
-                              eos="unesco")
+                            temperature=envSel$Tmean_Robinson,
+                            pressure=(envSel$bathy*-1),
+                            eos="unesco")
 
 
 envSel<-envSel[ , colSums(is.na(envSel))==0] #Remove environmental variables with NAs
@@ -342,7 +344,7 @@ ggplot()+
   geom_point(data = env_orig[rowSums(env_orig[,c('no_vision','poor_vision')], na.rm = TRUE) > 0.5,], aes(x_coord, y_coord, color = "Poor vision"), alpha = 0.5, size = 1)+
   geom_point(data = env_orig[env_orig$SegLength< 190,], aes(x_coord, y_coord, color = "Too short"), alpha = 0.5, size = 1)+
   geom_point(data = env_orig[env_orig$SegLength> 300,], aes(x_coord, y_coord, color = "Too long"), alpha = 0.5, size = 1)+
-
+  
   geom_point(data = env_orig[env_orig$bathy > -100,], aes(x_coord, y_coord, color = "Too shallow"), alpha = 0.5, size = 1)+
   geom_point(data = env_orig[env_orig$cruise_no  == "2006612",], aes(x_coord, y_coord, color = "2006 cruise"), alpha = 0.5, size = 1)+
   geom_point(data = envSel_split[["All"]], aes(x_coord, y_coord, color = "Not excluded"), size = 1)+
@@ -400,8 +402,8 @@ otu_sp<- gsub("[.]", "_", otu_sp)
 temp_sp <-gsub(";", ".", Taxonomic_DF$Species)
 temp_sp <-gsub("[ /]", "_", temp_sp)
 temp_sp<-ifelse(str_sub(temp_sp,-3,-1) == "_sp", 
-str_sub(temp_sp, -str_length(temp_sp),-4),
- temp_sp)  
+                str_sub(temp_sp, -str_length(temp_sp),-4),
+                temp_sp)  
 
 Taxonomic_DF<-Taxonomic_DF[temp_sp %in% otu_sp, ]
 
@@ -450,6 +452,8 @@ legend("topleft",
 
 
 ```{r}
+otu$SampID <- env$SampID
+
 save(Taxonomic_phylo, file = paste0(PathOutput,"Taxonomic_phylo_",SPLIT,".rda"))
 save(Branch_col, file = paste0(PathOutput,"Branch_col_",SPLIT,".rda"))
 save(Taxonomic_DF, file = paste0(PathOutput,"Taxonomic_DF",SPLIT,".rda"))
