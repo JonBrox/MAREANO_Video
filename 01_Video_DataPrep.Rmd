@@ -538,5 +538,4 @@ ggplot() +
   theme_classic()+
   coord_cartesian(xlim = c(-100000,1300000), ylim = c(6500000, 9000000))+
   geom_map(data =  ggworldMap, map = ggworldMap, aes(long, lat, map_id = id), fill = "#ddb892", alpha = 0.2)
-
 ```
