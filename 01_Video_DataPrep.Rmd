@@ -147,7 +147,7 @@ Join the different data sets to make them match and filter out some stations bas
 joinedDat<- left_join(otu_orig,env_orig, by="SampID")
 joinedDat<-joinedDat[!is.na(joinedDat$SampID),]
 joinedDat<-joinedDat[joinedDat$SegLengthM>length_lower & joinedDat$SegLengthM < length_upper,]
-joinedDat<-joinedDat[is.na(joinedDat$no_vision) | rowSums(joinedDat[,c('no_vision','poor_vision')], na.rm = TRUE) <0.5 | is.na(joinedDat$poor_vision),]
+joinedDat<-joinedDat[is.na(joinedDat$no_vision) | rowSums(joinedDat[,c('no_vision','poor_vision')], na.rm = TRUE) <bad_vision | is.na(joinedDat$poor_vision),]
 joinedDat<-joinedDat[joinedDat$cruise_no != "2006612",]
 
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
