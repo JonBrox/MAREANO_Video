@@ -2,9 +2,11 @@ colnames(otuCompl) <-gsub(";", ".", colnames(otuCompl))
 colnames(otuCompl) <-gsub("[ /]", "_", colnames(otuCompl))
 otuSel <- otuCompl[,c(FALSE, colSums(otuCompl[,-c(1)] >0)>0)]
 
-# Get Aphia id numbers for all
+print("Searching for AphiaID for all species...")
 source(paste0(PathScripts,"TaxonarySp_to_AphiaID.r"))
 AphiaIDs<-SpAphia_df[,5]
+
+print("Searching for Taxonomic crach for all Aphia IDs...")
 Taxonomic_DF<-Aphia2TaxoTree(as.numeric(AphiaIDs))
 Taxonomic_DF<-as.data.frame(Taxonomic_DF)
 Taxonomic_DF[]<-lapply(Taxonomic_DF, as.character)
@@ -23,22 +25,6 @@ Taxonomic_DF[,3:ncol(Taxonomic_DF)]<-lapply(Taxonomic_DF[,3:ncol(Taxonomic_DF)],
 # Taxonomic_phylo$edge.length<-rep(1, length(Taxonomic_phylo$edge))
 
 # Order
-SpAphia_m_order<-SpAphia_m[order(Taxonomic_DF$Phylum,
-                                 Taxonomic_DF$Subphylum,
-                                 Taxonomic_DF$Superclass,
-                                 Taxonomic_DF$Class,
-                                 Taxonomic_DF$Subclass,
-                                 Taxonomic_DF$Infraclass,
-                                 Taxonomic_DF$Superorder,
-                                 Taxonomic_DF$Order,
-                                 Taxonomic_DF$Suborder,
-                                 Taxonomic_DF$Infraorder,
-                                 Taxonomic_DF$Superfamily,
-                                 Taxonomic_DF$Family,
-                                 Taxonomic_DF$Subfamily,
-                                 Taxonomic_DF$Infrafamily,
-                                 Taxonomic_DF$Genus,
-                                 Taxonomic_DF$Species),]
 Taxonomic_DF<-Taxonomic_DF[order(Taxonomic_DF$Phylum,
                                  Taxonomic_DF$Subphylum,
                                  Taxonomic_DF$Superclass,
@@ -76,8 +62,8 @@ for(i in 1:nrow(Taxonomic_DF_Groups)){
   
   if(nrow(tempdf) < 2){next}
   
-  print(paste(AddTo))
-  print(paste(tempdf$Species))
+  print(paste0(c(AddTo,"<--- ", paste(tempdf$Species, collapse="; ")) , collapse= ""))  
+  
   Taxonomic_DF_Groups[rownames(tempdf),paste0("AddTo",Taxonomic_DF_Groups[i,2])]<- tempdf[, paste0("AddTo",Taxonomic_DF_Groups[i,2])]
 }
 
