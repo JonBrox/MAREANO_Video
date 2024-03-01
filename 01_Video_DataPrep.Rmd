@@ -158,10 +158,11 @@ joinedDat<-joinedDat[!(joinedDat$cruise_no == "2019115" & joinedDat$x_coord> 400
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 # Instead of taking random segement from long transects, we now select the first segment of any transect 
-temp_01<-joinedDat[!(str_sub(joinedDat$SampID,-2,-1) %in% c("06","05","04","03","02","00" ,"_D")),]
-joinedDat<-joinedDat[!(str_sub(joinedDat$SampID,-2,-1) %in% c("06","05","04","03","02","01", "_D")),]
+temp_01<-joinedDat[!(str_sub(joinedDat$SampID,-2,-1) %in% c("06","05","04","03","02","00" ,"_D", "_C", "_B")),]
+joinedDat<-joinedDat[!(str_sub(joinedDat$SampID,-2,-1) %in% c("06","05","04","03","02","01", "_D", "_C", "_B")),]
 joinedDat<-rbind(joinedDat, temp_01[!(temp_01$VL %in% joinedDat$VL),])
 
+joinedDat<-joinedDat[!is.na(joinedDat),]
 #Takes one random 200m transect from each station
 joinedDat<-joinedDat %>%
   dplyr::group_by(VL)%>%
@@ -261,6 +262,9 @@ Taxonary[Taxonary$Reference_List %in% c("Primnoa resedaeformis;impacted"), 'Anal
 Taxonary[Taxonary$Reference_List %in% c("Paragorgia arborea;impacted"), 'Analysis_name']<-"Paragorgia arborea"
 Taxonary[Taxonary$Reference_List %in% c("Porifera brown papillae"), 'Analysis_name']<-"Polymastiidae" # "Polymastia sp.", "Weberella bursa","Polymastia grimaldii"
  
+Taxonary[Taxonary$Reference_List %in% c("Drifa_glomerata", "Duva_florida","Duva_sp.","Gersemia_rubiformis"), 'Analysis_name']<-"Nephtheidae"
+
+
 FixThis<-c("Porifera encrusting","Porifera medium" ,"Porifera small","Porifera small round","Porifera small;stalked","Porifera small;stalked","Porifera erect","Porifera branched","Polymastiidae","Porifera fan","Primnoa resedaeformis" ,"Paragorgia arborea")
 
 for(i in 1:length(FixThis)){
@@ -368,7 +372,7 @@ ggplot()+
 ```{r}
 SPLIT<-"All"
 
-otu<-otuSel_split[[SPLIT]][,-c(1, ncol(otuSel_split[[SPLIT]]))]
+otu<-otuSel_split[[SPLIT]][,-c(1)] #ncol(otuSel_split[[SPLIT]])
 env<-envSel_split[[SPLIT]]
 
 stations_sel <- rowSums(otu>0) > MinOTUs
