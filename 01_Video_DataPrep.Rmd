@@ -147,7 +147,7 @@ Join the different data sets to make them match and filter out some stations bas
 joinedDat<- left_join(otu_orig,env_orig, by="SampID")
 joinedDat<-joinedDat[!is.na(joinedDat$SampID),]
 joinedDat<-joinedDat[joinedDat$SegLengthM>length_lower & joinedDat$SegLengthM < length_upper,]
-joinedDat<-joinedDat[is.na(joinedDat$no_vision) | rowSums(joinedDat[,c('no_vision','poor_vision')], na.rm = TRUE) <bad_vision | is.na(joinedDat$poor_vision),]
+joinedDat<-joinedDat[is.na(joinedDat$no_vision) | rowSums(joinedDat[,c('no_vision','poor_vision')], na.rm = TRUE) < bad_vision | is.na(joinedDat$poor_vision),]
 joinedDat<-joinedDat[joinedDat$cruise_no != "2006612",]
 
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -175,7 +175,7 @@ joinedDat<-joinedDat[joinedDat$bathy <= MinDepth,]
 # Stations that continued to give issue on the spatial analyeses
 StationRefs <- read.csv(paste0(PathInputData,"reference.csv"), sep = "|") %>% as.data.frame
 
-joinedDat<-joinedDat[!(joinedDat$VL %in% c('2340', '544', '254', '829', StationRefs[!is.na(StationRefs$reason_excluded),'nSampleNumber'])),]
+joinedDat<-joinedDat[!(joinedDat$VL %in% c('2340', '544', '254', '829','606', '162', StationRefs[!is.na(StationRefs$reason_excluded),'nSampleNumber'])),]
 ```
 
 # SEPARATE joineddat
@@ -329,16 +329,18 @@ StudyRegion<-envSel[,  'SampID']
 envSel_split[["All"]]<-envSel[envSel$SampID  %in% StudyRegion$SampID,]
 otuSel_split[["All"]]<-otuSel[otuSel$SampID %in% StudyRegion$SampID,]
 
-ggplot()+
-  geom_point(data = env_orig[ env_orig$SampID %in% otuCompl[rowSums(otuCompl[, -c(1)]>0) <= MinOTUs,'SampID'],], aes(x_coord, y_coord, color = "Few otus"), size = 0.8)+
-  geom_point(data = env_orig[rowSums(env_orig[,c('no_vision','poor_vision')], na.rm = TRUE) > 0.5,], aes(x_coord, y_coord, color = "Poor vision"), alpha = 0.5, size = 0.8)+
-  geom_point(data = env_orig[env_orig$SegLength< length_lower,], aes(x_coord, y_coord, color = "Too short"), alpha = 0.5, size = 0.8)+
-  geom_point(data = env_orig[env_orig$SegLength> length_upper,], aes(x_coord, y_coord, color = "Too long"), alpha = 0.5, size = 0.8)+
+PointSizes<- 1
 
-  geom_point(data = env_orig[env_orig$bathy > MinDepth,], aes(x_coord, y_coord, color = "Too shallow"), alpha = 0.5, size = 0.8)+
-  geom_point(data = env_orig[env_orig$cruise_no  == "2006612" | (env_orig$cruise_no == "2019115" & env_orig$x_coord> 400000 & env_orig$y_coord>8500000),], aes(x_coord, y_coord, color = "2006 cruise \n& Kongfjord"), alpha = 0.5, size = 0.8)+
-  geom_point(data = envSel_split[["All"]], aes(x_coord, y_coord, color = "Not excluded"), size = 0.8)+
-    geom_map(data =  ggworldMap, map = ggworldMap, aes(long, lat, map_id = id), fill = "#ddb892", alpha = 0.2)+
+ggplot()+
+  geom_point(data = env_orig[ env_orig$SampID %in% otuCompl[rowSums(otuCompl[, -c(1)]>0) <= MinOTUs,'SampID'],], aes(x_coord, y_coord, color = "Few otus"), size = PointSizes)+
+  geom_point(data = env_orig[rowSums(env_orig[,c('no_vision','poor_vision')], na.rm = TRUE) > 0.5,], aes(x_coord, y_coord, color = "Poor vision"), alpha = 0.5, size = PointSizes)+
+  geom_point(data = env_orig[env_orig$SegLength< length_lower,], aes(x_coord, y_coord, color = "Too short"), alpha = 0.5, size = PointSizes)+
+  geom_point(data = env_orig[env_orig$SegLength> length_upper,], aes(x_coord, y_coord, color = "Too long"), alpha = 0.5, size = PointSizes)+
+
+  geom_point(data = env_orig[env_orig$bathy > MinDepth,], aes(x_coord, y_coord, color = "Too shallow"), alpha = 0.5, size = PointSizes)+
+  geom_point(data = env_orig[env_orig$cruise_no  == "2006612" | (env_orig$cruise_no == "2019115" & env_orig$x_coord> 400000 & env_orig$y_coord>8500000),], aes(x_coord, y_coord, color = "2006 cruise \n& Kongfjord"), alpha = 0.5, size = PointSizes)+
+  geom_point(data = envSel_split[["All"]], aes(x_coord, y_coord, color = "Not excluded"), size = PointSizes)+
+    geom_map(data =  ggworldMap, map = ggworldMap, aes(long, lat, map_id = id), fill = "#ddb892", alpha = 0.4)+
   theme_void()+
   scale_color_manual(name='Stations excluded',
                      breaks=c('Poor vision', 'Too short','Too long', 'Too shallow', '2006 cruise \n& Kongfjord','Not excluded', "Few otus"),
@@ -519,7 +521,6 @@ otu$SampID <- env$SampID
 save(Taxonomic_phylo, file = paste0(PathOutput,"Taxonomic_phylo_",SPLIT,".rda"))
 save(Branch_col, file = paste0(PathOutput,"Branch_col_",SPLIT,".rda"))
 save(Taxonomic_DF, file = paste0(PathOutput,"Taxonomic_DF",SPLIT,".rda"))
-
 save(otu, file = paste0(PathOutput,"otu_Video_",SPLIT,".rda"))
 save(env, file =paste0(PathOutput,"env_Video_",SPLIT,".rda"))
 ```
