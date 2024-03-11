@@ -133,7 +133,7 @@ otu_orig<-otu_orig[,c(TRUE, colnames(otu_orig)[-1] %in% Taxonary[
     Taxonary$Specificity<4 & 
     Taxonary$Object_type == "Organism" & 
     Taxonary$Ecosystem_section != "Pelagic" &
-    !(Taxonary$Grouping_taxon_biotope %in% c("Algae", "Bacteria", "Biota", "Foraminifera","Bryozoa"))  ,'Reference_List'])]
+    !(Taxonary$Grouping_taxon_biotope %in% c("Algae", "Bacteria", "Biota", "Foraminifera","Bryozoa")) ,'Reference_List'])]
 ```
 
 # JOIN DATASETS 
@@ -158,8 +158,8 @@ joinedDat<-joinedDat[!(joinedDat$cruise_no == "2019115" & joinedDat$x_coord> 400
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 # Instead of taking random segement from long transects, we now select the first segment of any transect 
-temp_01<-joinedDat[!(str_sub(joinedDat$SampID,-2,-1) %in% c("06","05","04","03","02","00" ,"_D", "_C", "_B")),]
-joinedDat<-joinedDat[!(str_sub(joinedDat$SampID,-2,-1) %in% c("06","05","04","03","02","01", "_D", "_C", "_B")),]
+temp_01<-joinedDat[!(str_sub(joinedDat$SampID,-2,-1) %in% c("06","05","04","03","02","00" ,"_D", "_C")),]
+joinedDat<-joinedDat[!(str_sub(joinedDat$SampID,-2,-1) %in% c("06","05","04","03","02","01", "_D", "_C")),]
 joinedDat<-rbind(joinedDat, temp_01[!(temp_01$VL %in% joinedDat$VL),])
 
 joinedDat<-joinedDat[!is.na(joinedDat),]
@@ -182,9 +182,12 @@ joinedDat<-joinedDat[!(joinedDat$VL %in% c('2340', '544', '254', '829','606', '1
 # SEPARATE joineddat
 Separate the now matching datasets (joinedDat -> otu_sort + env_sort)
 ```{r, warning=FALSE}
-otu_sort<- joinedDat %>% dplyr::select(c(1,2:which(colnames(joinedDat)==names(otu_orig)[ncol(otu_orig)])))
+otu_sort<- joinedDat %>% 
+  dplyr::select(c(1,2:which(colnames(joinedDat)==names(otu_orig)[ncol(otu_orig)])))
 
-envCompl<-env_sort<-joinedDat %>% dplyr::select(c(1, (which(colnames(joinedDat)==names(otu_orig)[ncol(otu_orig)])+1):ncol(joinedDat)))
+envCompl<-env_sort<-joinedDat %>% 
+  dplyr::select(c(1, (which(colnames(joinedDat)==names(otu_orig)[ncol(otu_orig)])+1):ncol(joinedDat)))
+
 envCompl$Trawling<-extract(rHarvestEffort, envCompl[,c('x_coord', 'y_coord')]) # Add the trawling data created before
 ```
 
@@ -197,6 +200,11 @@ otuCompl<-otu_sort %>% select_if(~ !is.numeric(.) || sum(.) != 0)
 #Remove species
 otuCompl<-otuCompl[,-which(colnames(otuCompl) %in% c("Cup coral" #, # This one gets lost in the taxonomic functions because it is not associated to any toxonomic valid name
 ))]
+
+ colnames(otuCompl) <-gsub(";", "_", colnames(otuCompl))
+ colnames(otuCompl) <-gsub("[ /]", "_",  colnames(otuCompl))
+ colnames(otuCompl)<-ifelse(str_sub( colnames(otuCompl),-3,-1) != "sp.", gsub("[.]", "_",  colnames(otuCompl)),  colnames(otuCompl))  
+
 ```
 
 Results in a data set that contains information on which species could be summed with otus of coarser resolution. This is done to improve predictions of those coarser resolution otus, which in turn might help improve prediction strength on the finer resolutions
@@ -212,7 +220,6 @@ levels(Taxonomic_DF_Groups$Species)[levels(Taxonomic_DF_Groups$Species) == "Echi
 Sums observations of finer resoltuions to the higher resolutions
 ```{r}
 MultiSpecies <- c("Ceramaster_Hippasterias", "Porania_Poraniomorpha" ,"Bythocaris_Boreomysis", "Lycodonus_Lycenchelys_Lumpenus", "Lycodonus_Lycenchelys", "Phakellia_Axinella", "Geodia_Stryphnus", "Geodia_Stelleta")
-
 otuCompl_Sum<-otuCompl
 for(i in 2:ncol(otuCompl)){
   
@@ -265,7 +272,7 @@ Taxonary[Taxonary$Reference_List %in% c("Porifera brown papillae"), 'Analysis_na
 Taxonary[Taxonary$Reference_List %in% c("Drifa_glomerata", "Duva_florida","Duva_sp.","Gersemia_rubiformis"), 'Analysis_name']<-"Nephtheidae"
 
 
-FixThis<-c("Porifera encrusting","Porifera medium" ,"Porifera small","Porifera small round","Porifera small;stalked","Porifera small;stalked","Porifera erect","Porifera branched","Polymastiidae","Porifera fan","Primnoa resedaeformis" ,"Paragorgia arborea")
+FixThis<-c("Porifera encrusting","Porifera medium" ,"Porifera small","Porifera small round","Porifera small;stalked","Porifera small;stalked","Porifera erect","Porifera branched","Polymastiidae","Porifera fan","Primnoa resedaeformis" ,"Paragorgia arborea", "Nephtheidae")
 
 for(i in 1:length(FixThis)){
   From<-Taxonary[!is.na(Taxonary$Analysis_name) & Taxonary$Analysis_name %in% FixThis[i],'Reference.List2']
@@ -307,7 +314,7 @@ Subsets based on thresholds:
 ```{r}
 # Removes species with less than "MinSightings" that are not VMEs
 Sp_sel <- c(TRUE, colSums(otuCompl[, -c(1)]>0) > MinSightings)
-Sp_sel[which(colnames(Sp_sel) %in% c(ALL_vme))]<-TRUE
+Sp_sel[which(names(Sp_sel) %in% c(ALL_vme))]<-TRUE
 
 stations_sel <- rowSums(otuCompl[, -c(1)]>0) > MinOTUs
 
@@ -466,62 +473,124 @@ legend("topleft",
 ```{r}
 
 Traits_orig<-read_excel(paste0(PathInputData,"/TraitsData.xlsx"), col_names = TRUE)
+Traits_orig[!is.na(Traits_orig$Reference_List2) & Traits_orig$Reference_List2 == "Mycale_-Mycale-_lingua","Reference_List2"]<-"Mycale_lingua"
 
 Traits_orig<-Traits_orig[Traits_orig$Reference_List2 %in% otu_sp,]
 
 TraitsSel<-Traits_orig[,c('AphiaID', 'Reference_List2',
-                'Sociability_Solitary', 'Sociability_Gregarious', 'Sociability_Colonial',"SociabilityGradient",
-                'Size_0_1','Size_1_2','Size_2_10','Size_10_20','Size_20_50','Size_50cm_',
-                'BodyType_Flat','BodyType_Mound','BodyType_Erect','BodyType_Other',
-                'Larvae_Pelagic.planktotrophic.','Larvae_Pelagic.lecithtrophic.','Larvae_Benthic.DirectDevelopment.',
-                'Reprod_AsexualBudding','Reprod_Sexual_BroadcastSpawnEggs','Reprod_Sexual_SeaBedEggs','Reprod_Sexual_BroodsEggs','Reprod_Hermaphrodite',
-                "Bioturb_Epifauna","Bioturb_SurfaceModifiers","Bioturb_UpwardConveyors","Bioturb_DownwardConveyors","Bioturb_BiodiffusiveMixers",
-                'Habit_TubeDwelling','Habit_BurrowDwelling','Habit_FreeLiving','Habit_CreviceDweller','Habit_Epi.endo_Zoic.phytic','Habit_Attached',
-                'Feed_SuspensionFilter','Feed_SurfaceDeposit','Feed_SubsurfaceDeposit','Feed_Scavenger','Feed_Predator',
-                'Mobility_Anchored','Mobility_PermanentAttached','Mobility_TemporaryAttached','Mobility_Sessile','Mobility_Swim','Mobility_Drifter','Mobility_Crawl',
-                'HabitatEffect_ReefBuilding','HabitatEffect_Bedforming')]
+                          #   'Sociability_Solitary', 'Sociability_Gregarious', 
+                          'Sociability_Colonial',"SociabilityGradient",
+                          'Size_0_1','Size_1_2','Size_2_10','Size_10_20','Size_20_50','Size_50cm_',
+                          'BodyType_Flat','BodyType_Mound','BodyType_Erect','BodyType_Other',
+                          #'Larvae_Pelagic.planktotrophic.','Larvae_Pelagic.lecithtrophic.','Larvae_Benthic.DirectDevelopment.',
+                          #'Reprod_AsexualBudding','Reprod_Sexual_BroadcastSpawnEggs','Reprod_Sexual_SeaBedEggs','Reprod_Sexual_BroodsEggs','Reprod_Hermaphrodite',
+                          "Bioturb_Epifauna","Bioturb_SurfaceModifiers","Bioturb_UpwardConveyors","Bioturb_DownwardConveyors","Bioturb_BiodiffusiveMixers",
+                          'Habit_TubeDwelling','Habit_BurrowDwelling','Habit_FreeLiving','Habit_CreviceDweller','Habit_Epi.endo_Zoic.phytic','Habit_Attached',
+                          'Feed_SuspensionFilter','Feed_SurfaceDeposit','Feed_SubsurfaceDeposit','Feed_Scavenger','Feed_Predator',
+                          'Mobility_Anchored','Mobility_PermanentAttached','Mobility_TemporaryAttached','Mobility_Sessile','Mobility_Swim','Mobility_Drifter','Mobility_Crawl',
+                          'HabitatEffect_ReefBuilding','HabitatEffect_Bedforming')]
+
 
 
 TraitsSel$BodyType<-colnames(TraitsSel[,which(colnames(TraitsSel) %in% c("BodyType_Flat", "BodyType_Mound", "BodyType_Erect"))])[max.col(TraitsSel[,which(colnames(TraitsSel) %in% c("BodyType_Flat", "BodyType_Mound", "BodyType_Erect"))],ties.method="first")]
 TraitsSel[rowSums(TraitsSel[,which(colnames(TraitsSel) %in% c("BodyType_Flat", "BodyType_Mound", "BodyType_Erect"))]) < 2,'BodyType'] <- "Other"
+TraitsSel[TraitsSel$BodyType %in% c("BodyType_Flat"),'BodyType']<-"Flat"
+TraitsSel[TraitsSel$BodyType %in% c("BodyType_Mound"),'BodyType']<-"Mound"
+TraitsSel[TraitsSel$BodyType %in% c("BodyType_Erect"),'BodyType']<-"Erect"
+
+
+TraitsSel$Size<-NA
+TraitsSel$Size<-colnames(TraitsSel[,which(colnames(TraitsSel) %in% c("Size_0_1","Size_1_2", "Size_2_10", "Size_10_20", "Size_20_50", "Size_50cm_"))])[max.col(TraitsSel[,which(colnames(TraitsSel) %in% c("Size_0_1","Size_1_2", "Size_2_10", "Size_10_20", "Size_20_50", "Size_50cm_"))],ties.method="first")]
+TraitsSel[TraitsSel$Size %in% c("Size_0_1","Size_1_2", "Size_2_10"),'Size']<-"S"
+TraitsSel[TraitsSel$Size %in% c("Size_10_20"),'Size']<-"M"
+TraitsSel[TraitsSel$Size %in% c("Size_20_50"),'Size']<-"L"
+TraitsSel[TraitsSel$Size %in% c("Size_50cm_"),'Size']<-"XL"
+
+# TraitsSel[TraitsSel$Size_2_10>0 | TraitsSel$Size_10_20>0,'Size']<-"Medium"
+# TraitsSel[TraitsSel$Size_20_50>0 | TraitsSel$Size_50cm_>0,'Size']<-"Large"
+
+# TraitsSel$Larvae<-NA
+# TraitsSel[TraitsSel$Larvae_Benthic.DirectDevelopment.>0,'Larvae']<-"None"
+# TraitsSel[TraitsSel$Larvae_Pelagic.planktotrophic.>0,'Larvae']<-"Planktotrophic"
+# TraitsSel[TraitsSel$Larvae_Pelagic.lecithtrophic.>0,'Larvae']<-"Lecithotrophic"
+# TraitsSel[TraitsSel$Larvae_Pelagic.planktotrophic.>0 & TraitsSel$Larvae_Pelagic.lecithtrophic.>0,'Larvae']<-"Both"
+
+
+# TraitsSel$Sociability<-colnames(TraitsSel[,3:5])[max.col(TraitsSel[,3:5],ties.method="first")]
+# TraitsSel[TraitsSel$Sociability %in% c("Sociability_Solitary") ,'Sociability']<-"Solo"
+# TraitsSel[TraitsSel$Sociability %in% c("Sociability_Gregarious") ,'Sociability']<-"Group"
+#TraitsSel[TraitsSel$Sociability %in% c("Sociability_Colonial") ,'Sociability']<-"Colony"
 
 TraitsSel[TraitsSel$Habit_Attached>0 |TraitsSel$Habit_Epi.endo_Zoic.phytic >0,'Habitat']<-"Attached"
 TraitsSel$Habitat<-colnames(TraitsSel[,which(colnames(TraitsSel) %in% c("Habit_TubeDwelling", "Habit_BurrowDwelling", "Habit_FreeLiving", "Habit_CreviceDweller", "Habit_Epi.endo_Zoic.phytic", "Habit_Attached"))])[max.col(TraitsSel[,which(colnames(TraitsSel) %in% c("Habit_TubeDwelling", "Habit_BurrowDwelling", "Habit_FreeLiving", "Habit_CreviceDweller", "Habit_Epi.endo_Zoic.phytic", "Habit_Attached"))],ties.method="first")]
 TraitsSel[TraitsSel$Habitat %in% c("Habit_Attached", "Habit_Epi.endo_Zoic.phytic") ,'Habitat']<-"Attached"
-TraitsSel[TraitsSel$Habitat %in% c("Habit_BurrowDwelling" ,"Habit_CreviceDweller"),'Habitat']<-"BurrowORCrevice"
+TraitsSel[TraitsSel$Habitat %in% c("Habit_BurrowDwelling" ,"Habit_TubeDwelling"),'Habitat']<-"TubeORBurrow"
 TraitsSel[TraitsSel$Habitat == "Habit_FreeLiving" ,'Habitat']<-"Free"
-TraitsSel[TraitsSel$Habitat == "Habit_TubeDwelling" ,'Habitat']<-"TubeDwelling"
+TraitsSel[TraitsSel$Habitat == "Habit_CreviceDweller" ,'Habitat']<-"CreviceDweller"
 
 TraitsSel$Mobility<-colnames(TraitsSel[,which(colnames(TraitsSel) %in% c("Mobility_Anchored","Mobility_PermanentAttached", "Mobility_TemporaryAttached", "Mobility_Sessile", "Mobility_Swim", "Mobility_Drifter", "Mobility_Crawl"))])[max.col(TraitsSel[,which(colnames(TraitsSel) %in% c("Mobility_Anchored","Mobility_PermanentAttached", "Mobility_TemporaryAttached", "Mobility_Sessile", "Mobility_Swim", "Mobility_Drifter", "Mobility_Crawl"))],ties.method="first")]
+TraitsSel[TraitsSel$Mobility %in% c("Mobility_PermanentAttached", "Mobility_Sessile", "Mobility_Anchored") ,'Mobility']<-"Sessile"
+TraitsSel[TraitsSel$Mobility %in% c("Mobility_TemporaryAttached") ,'Mobility']<-"TemporAttach"
+ TraitsSel[TraitsSel$Mobility %in% c("Mobility_Crawl") ,'Mobility']<-"Crawl"
+# TraitsSel[TraitsSel$Mobility %in% c("Mobility_Crawl", "Mobility_Drifter") ,'Mobility']<-"Medium"
+TraitsSel[TraitsSel$Mobility %in% c("Mobility_Swim") ,'Mobility']<-"Swim"
+
+
+
+TraitsSel$Feeding<-colnames(TraitsSel[,which(colnames(TraitsSel) %in% c("Feed_SuspensionFilter","Feed_SurfaceDeposit","Feed_SubsurfaceDeposit","Feed_Scavenger","Feed_Predator"))])[max.col(TraitsSel[,which(colnames(TraitsSel) %in% c("Feed_SuspensionFilter","Feed_SurfaceDeposit","Feed_SubsurfaceDeposit","Feed_Scavenger","Feed_Predator"))],ties.method="first")]
+TraitsSel[TraitsSel$Feeding %in% c("Feed_Scavenger","Feed_Predator") ,'Feeding']<-"PredatorScavenger"
+TraitsSel[TraitsSel$Feeding %in% c("Feed_SubsurfaceDeposit","Feed_SurfaceDeposit") ,'Feeding']<-"Surface"
+TraitsSel[TraitsSel$Feeding %in% c("Feed_SuspensionFilter") ,'Feeding']<-"Suspension"
+
 
 TraitsSel$Bioturbation<-colnames(TraitsSel[,which(colnames(TraitsSel) %in% c("Bioturb_Epifauna","Bioturb_SurfaceModifiers","Bioturb_UpwardConveyors","Bioturb_DownwardConveyors","Bioturb_BiodiffusiveMixers"))])[max.col(TraitsSel[,which(colnames(TraitsSel) %in% c("Bioturb_Epifauna","Bioturb_SurfaceModifiers","Bioturb_UpwardConveyors","Bioturb_DownwardConveyors","Bioturb_BiodiffusiveMixers"))],ties.method="first")]
+TraitsSel[TraitsSel$Bioturbation %in% c("Bioturb_Epifauna") ,'Bioturbation']<-"Epifauna"
+TraitsSel[TraitsSel$Bioturbation %in% c("Bioturb_SurfaceModifiers") ,'Bioturbation']<-"SurfaceModifier"
+TraitsSel[TraitsSel$Bioturbation %in% c("Bioturb_UpwardConveyors", "Bioturb_DownwardConveyors") ,'Bioturbation']<-"UpDownConveyor"
+TraitsSel[TraitsSel$Bioturbation %in% c("Bioturb_BiodiffusiveMixers") ,'Bioturbation']<-"BiodiffusiveMixer"
 
-TraitsSel$Colonial<-ifelse(TraitsSel$Sociability_Colonial>0, "Col", "NonCol")
+
+
+TraitsSel$Colonial<-ifelse(TraitsSel$Sociability_Colonial>0, "Col", "Ind")
+
+#  TraitsSel$Sensitivity<-colnames(TraitsSel[,40:43])[max.col(TraitsSel[,40:43],ties.method="first")]
+
+plot_si<-ggplot(TraitsSel)+geom_bar(aes("Size",fill = Size))+theme_classic()+theme(axis.title =  element_blank(),legend.position = "bottom", legend.direction="vertical")
 plot_bt<-ggplot(TraitsSel)+geom_bar(aes("Body type",fill = BodyType))+theme_classic()+theme(axis.title =  element_blank(),legend.position = "bottom", legend.direction="vertical")
+#plot_he<-ggplot(TraitsSel)+geom_bar(aes("Habitat effect",fill = HabitatEffect))+theme_classic()+theme(axis.title =  element_blank(),legend.position = "bottom", legend.direction="vertical")
+#plot_l<-ggplot(TraitsSel)+geom_bar(aes("Larvae",fill = Larvae))+theme_classic()+theme(axis.title =  element_blank(),legend.position = "bottom", legend.direction="vertical")
 plot_h<-ggplot(TraitsSel)+geom_bar(aes("Habitat",fill = Habitat))+theme_classic()+theme(axis.title =  element_blank(),legend.position = "bottom", legend.direction="vertical")
 plot_m<-ggplot(TraitsSel)+geom_bar(aes("Mobility",fill = Mobility))+theme_classic()+theme(axis.title =  element_blank(),legend.position = "bottom", legend.direction="vertical")
+plot_f<-ggplot(TraitsSel)+geom_bar(aes("Feeding",fill = Feeding))+theme_classic()+theme(axis.title =  element_blank(),legend.position = "bottom", legend.direction="vertical")
 plot_sp<-ggplot(TraitsSel)+geom_bar(aes("Sociability",fill = as.factor(SociabilityGradient)))+theme_classic()+theme(axis.title =  element_blank(),legend.position = "bottom", legend.direction="vertical")
 plot_tur<-ggplot(TraitsSel)+geom_bar(aes("Bioturbation",fill = Bioturbation))+theme_classic()+theme(axis.title =  element_blank(),legend.position = "bottom", legend.direction="vertical")
+
 plot_col<-ggplot(TraitsSel)+geom_bar(aes("Colonial",fill = as.factor(Colonial)))+theme_classic()+theme(axis.title =  element_blank(),legend.position = "bottom", legend.direction="vertical")
 
 
+#ggarrange(plot_si,plot_bt,plot_he,plot_l,plot_h,plot_m,plot_f,plot_sp)
+plot_si
 plot_bt
+#plot_he
+#plot_l
 plot_h
 plot_m
+plot_f
 plot_sp
 plot_tur
 plot_col
 
+
 traits<-TraitsSel
 rownames(traits)<-traits$Reference_List2
 
-traits<-traits[match(otu_sp, row.names(traits)),]
+traits<-traits[match(colnames(otu), row.names(traits)),]
 ```
 
 
 ```{r}
 otu$SampID <- env$SampID
-
+save(traits, file = paste0(PathOutput,"traits_",SPLIT,".rda"))
 save(Taxonomic_phylo, file = paste0(PathOutput,"Taxonomic_phylo_",SPLIT,".rda"))
 save(Branch_col, file = paste0(PathOutput,"Branch_col_",SPLIT,".rda"))
 save(Taxonomic_DF, file = paste0(PathOutput,"Taxonomic_DF",SPLIT,".rda"))
