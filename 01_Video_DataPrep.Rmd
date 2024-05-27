@@ -404,8 +404,9 @@ env$Ice_PA<-as.factor(env$Ice_PA)
 #Checking for covariation in predictor variables
 ChosenEnvVar<- c("mud2",
                  "sand2",
-                 "Tmean_Robinson",
-                 "Smean_Robinson",
+                 "temp_mean",
+                 "temp_std",
+                 "salt_mean",
                  "log_bathy",
                  "log_msr5_mag",
                  "log_BO22_dissoxltmin_bdmean_n250")
