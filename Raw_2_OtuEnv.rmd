@@ -1,0 +1,509 @@
+---
+title: "Video_DataPrep"
+output: html_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+---
+
+# Load Required Packages
+```{r, message=FALSE, warning=FALSE}
+# Data manipulation and visualization
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(reshape2)
+library(readxl)
+library(openxlsx)
+
+# Specialized functionality
+library(psych)
+library(oce) # For water density calculations
+library(pals)
+library(sf)
+
+set.seed(6) # Ensure reproducibility in random selections
+```
+
+
+Define Paths and Utility Scripts
+```{r}
+HI_user <- "a39495"
+
+# Set file paths
+PathScripts <- paste0("C:/Users/", HI_user, "/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Scripts/")
+PathInputData <- paste0("C:/Users/", HI_user, "/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Input/")
+PathOutput <- paste0("C:/Users/", HI_user, "/Havforskningsinstituttet/MAREANO Biotope modelling - General/VideoData/Output/")
+PathTaxonary <- paste0("C:/Users/", HI_user, "/Havforskningsinstituttet/Video analysis lab - Reference List/Taxonary.xlsx")
+
+# Source required utility scripts
+source(paste0(PathScripts, "MY_TaxonomicFromWormsDF.r"))
+source(paste0(PathScripts, "VME_Spp.r"))
+
+```
+
+
+Define Thresholds
+```{r}
+length_lower <- 190   # Minimum segment length (meters)
+length_upper <- 300   # Maximum segment length (meters)
+bad_vision <- 0.5     # Vision quality threshold
+MinOTUs <- 3          # Minimum number of species per station
+MinSightings <- 20    # Minimum sightings for a species
+MinDepth <- -100      # Minimum depth (meters)
+
+```
+
+
+Load and Preprocess Data
+World Map
+```{r}
+load(paste0(PathInputData, "worldMap.rda"))
+worldMap_sf<-st_as_sf(worldMap)
+```
+Environmental Data
+```{r}
+load(paste0(PathInputData,"rHarvestEffort_raster.rda")) # loads rHarvestEffort
+
+# Load and preprocess environmental data
+env_orig <- read.csv(paste0(PathInputData, "envData_2023-07-21.csv")) %>%
+  distinct() %>%
+  mutate(across(where(is.character), as.factor))
+
+# Load sample information and merge
+samp_info <- read.csv(paste0(PathInputData, "sample_info.csv")) %>%
+  distinct(SampID, .keep_all = TRUE)
+
+env_orig <- env_orig %>%
+  left_join(samp_info %>% select(1:which(colnames(samp_info) == "no_vision")), by = "SampID")
+```
+
+Sediment Data
+```{r}
+# Load sediment information and calculate percentages
+# sed_info <- read.csv(paste0(PathInputData, "sedimMeans.csv")) %>%
+#   dcast(SampID ~ Substrate, value.var = "mean_percent") %>%
+#   replace(is.na(.), 0) %>%
+#   rowwise() %>%
+#   mutate(
+#     SUM = sum(c_across(-SampID), na.rm = TRUE),
+#     across(-c(SampID, SUM), ~ . / SUM * 100, .names = "percent_{col}")
+#   ) %>%
+#  mutate(
+#     SAND = rowSums(across(c("Sand","Sand_with_biomaterial","Sand_with_shells","Sand.with.shells")), na.rm = TRUE) + 
+#   across(c("Gravelly.sand")) * 0.75 + 
+#   across(c("Muddy sand")) * 0.65 + 
+#   rowSums(across(c("Sandy mud","Sandy_mud", "Sandy.mud")), na.rm = TRUE)* 0.35,
+#   
+#     MUD =rowSums(across(c("Clay", "clay (outcropping)", "Clay_spicules","Mud")), na.rm = TRUE) + 
+#   rowSums(across(c("Sandy mud","Sandy_mud", "Sandy.mud")), na.rm = TRUE) * 0.65 +
+#   across(c("Muddy sand")) * 0.35,
+#     GRAVEL = rowSums(across(c("Pebble", "Shellsand")), na.rm = TRUE),
+#   LopheliaLIVE = rowSums(across(c("Live lophelia", "Live_lophelia", "Live.Lophelia")), na.rm = TRUE),
+#   LopheliaDEAD = rowSums(across(c("Coral rubble", "Coral_rubble", "Coral.rubble", "Dead lophelia", "Dead_lophelia","lophelia rubbel", "Lophelia rubbel", "Lophelia_rubble")), na.rm = TRUE)
+#   )
+
+# Merge sediment information with environmental data
+env_orig <- env_orig %>%
+  select(-("X.1")) %>%
+  unique(.) %>%
+  left_join(sed_info, by = "SampID")
+```
+
+
+Biological Data
+```{r}
+# Load and preprocess biological data
+otu_orig <- read.csv(paste0(PathInputData, "species_densities.csv")) %>%
+  dcast(SampID ~ clean_taxonomy, value.var = "density_n100m2") %>%
+  replace(is.na(.), 0)
+
+# Adjust taxonomy for consistency
+otu_orig <- otu_orig %>%
+  rename_with(~ str_replace_all(., "Cephalopoda benthic", "Cephalopoda")) %>%
+  rename_with(~ str_replace_all(., "Pennatulacea", "Pennatuloidea"))
+
+```
+
+
+```{r}
+# Load taxonomy reference list
+Taxonary <- read.xlsx(PathTaxonary, sheet = 1) %>%
+  mutate(
+    Reference.List2 = str_replace_all(Reference_List, "[;/ ]", "_"),
+    Reference_List = case_when(
+      Reference_List == "Pennatulacea" ~ "Pennatuloidea",
+      Reference_List == "Cephalopoda benthic" ~ "Cephalopoda",
+      TRUE ~ Reference_List
+    )
+  )
+
+# Filter OTUs based on size, specificity, and ecosystem section
+otu_orig <- otu_orig %>%
+  dplyr::select(SampID, which(colnames(.) %in% (Taxonary %>%
+    filter(
+      Size_class %in% c("OK", "Detailed"),
+      Specificity < 4,
+      Object_type == "Organism",
+      Ecosystem_section != "Pelagic",
+      !Grouping_taxon_biotope %in% c("Algae", "Bacteria", "Biota", "Foraminifera")
+    ))$Reference_List))
+
+```
+
+
+
+Combine and Filter Datasets
+```{r}
+# Merge OTU and environmental data
+joinedDat <- otu_orig %>%
+  left_join(env_orig, by = "SampID") %>%
+  filter(
+    !is.na(SampID),
+    SegLengthM > length_lower & SegLengthM < length_upper,
+    is.na(no_vision) | rowSums(select(., no_vision, poor_vision), na.rm = TRUE) < bad_vision | is.na(poor_vision),
+    cruise_no != "2006612",
+    !(cruise_no == "2019115" & x_coord > 400000 & y_coord > 8500000)
+  ) %>%
+  group_by(VL) %>%
+  slice_head(n = 1) %>%
+  ungroup()
+
+# Remove stations with missing or erroneous data
+StationRefs <- read.csv(paste0(PathInputData, "reference.csv"), sep = "|")
+joinedDat <- joinedDat %>%
+  filter(
+    complete.cases(select(., x_coord, y_coord, cruise_no, Tmean_Robinson, bathy)),
+    bathy <= MinDepth,
+    !VL %in% c('2340', '544', '254', '829','606', '162',(StationRefs %>% filter(!is.na(reason_excluded)))$nSampleNumber)
+  )
+```
+
+Final Cleaning and Export
+```{r}
+# Separate OTU and environmental datasets
+otu_sort <- joinedDat %>% select(1:which(colnames(.) == names(otu_orig)[ncol(otu_orig)]))
+env_sort <- joinedDat %>% select(-(2:which(colnames(.) == names(otu_orig)[ncol(otu_orig)])))
+
+# Save trawling data
+env_sort <- env_sort %>%
+  mutate(Trawling = extract(rHarvestEffort, select(., x_coord, y_coord)))
+
+# Finalize datasets for further analysis
+envSel <- env_sort %>%
+  filter(rowSums(select(otu_sort, -SampID) > 0) > MinOTUs) %>%
+  mutate(
+    swDensRob_avs = swRho(
+      salinity = Smean_Robinson,
+      temperature = Tmean_Robinson,
+      pressure = abs(bathy),
+      eos = "unesco"
+    )
+  ) %>%
+  select(where(~ sum(is.na(.)) == 0)) %>%
+  mutate(SampID = as.factor(SampID))
+
+# envCompl<-env_sort<-joinedDat %>% 
+#   dplyr::select(c(1, (which(colnames(joinedDat)==names(otu_orig)[ncol(otu_orig)])+1):ncol(joinedDat)))
+# 
+# envCompl$Trawling<-extract(rHarvestEffort, envCompl[,c('x_coord', 'y_coord')]) # Add the trawling data created before
+
+
+
+
+
+
+#Remove species
+otuCompl <- otu_sort[, c(TRUE, colSums(otu_sort[,-1]>0) > MinSightings)]
+
+# otuCompl<-otuCompl[,-which(colnames(otuCompl) %in% c("Lycodonus/Lycenchelys/Lumpenus",
+#                                                      "Cup coral" # gets lost in the taxonomic functions because it is not associated to any toxonomic valid name
+# ))]
+
+colnames(otuCompl) <-gsub(";", "_", colnames(otuCompl))
+colnames(otuCompl) <-gsub("[ /]", "_",  colnames(otuCompl))
+colnames(otuCompl)<-ifelse(str_sub( colnames(otuCompl),-3,-1) != "sp.", gsub("[.]", "_",  colnames(otuCompl)),  colnames(otuCompl))  
+```
+
+
+
+```{r}
+#Takes otuCompl
+source(paste0(PathScripts,"TaxonomyAggregate.r")) 
+# Gives Taxonomic_DF_Groups
+levels(Taxonomic_DF_Groups$Species)[levels(Taxonomic_DF_Groups$Species) == "Echinoidea irregular"] <- "Irregularia"
+levels(Taxonomic_DF_Groups$Species)[levels(Taxonomic_DF_Groups$Species) == "Echinoidea regular"] <- "Carinacea"
+```
+
+
+Summing Observations of Finer Resolutions to Higher Resolutions
+```{r}
+MultiSpecies <- c(
+  "Ceramaster_Hippasterias", "Porania_Poraniomorpha", "Bythocaris_Boreomysis", 
+  "Lycodonus_Lycenchelys_Lumpenus", "Lycodonus_Lycenchelys", "Phakellia_Axinella", 
+  "Geodia_Stryphnus", "Geodia_Stelleta"
+)
+
+otuCompl_Sum <- otuCompl
+
+for (i in 2:ncol(otuCompl)) {
+  TargetSp <- colnames(otuCompl)[i]
+  TargetSp <- ifelse(str_sub(TargetSp, -3, -1) == "sp.", str_sub(TargetSp, -str_length(TargetSp), -5), TargetSp)
+  
+  if (TargetSp == "Bythocaris") next
+
+  # Handle multi-species observations differently
+  if (TargetSp %in% MultiSpecies) {
+    MultiSp <- unlist(str_split(TargetSp, "_"))
+    if (any(MultiSp %in% "Hippasterias")) MultiSp <- c("Ceramaster", "Hippasteria")
+    
+    RelatedSp <- Taxonomic_DF_Groups %>%
+      dplyr::select(which(colnames(Taxonomic_DF_Groups) == "Genus"):ncol(Taxonomic_DF_Groups)) %>%
+      filter_all(any_vars(. %in% MultiSp))
+    
+  } else {
+    if (TargetSp == "Echinoidea_regular") TargetSp <- "Carinacea"
+    if (TargetSp == "Echinoidea_irregular") TargetSp <- "Irregularia"
+    
+   RelatedSp <- Taxonomic_DF_Groups %>%
+      dplyr::select(which(colnames(Taxonomic_DF_Groups) == "Species"):ncol(Taxonomic_DF_Groups)) %>%
+      filter_all(any_vars(. %in% c(TargetSp)))
+  }
+
+  OtherSp <- RelatedSp$Species[RelatedSp$Species != TargetSp]
+  if (length(OtherSp) == 0) next
+
+  print(paste0(c(TargetSp, "<--- ", paste(OtherSp, collapse = "; ")), collapse = ""))
+
+  temp_sp <- gsub(";", ".", c(colnames(otuCompl)[i], paste(OtherSp)))
+  temp_sp <- gsub("[ /]", "_", temp_sp)
+  temp_sp <- ifelse(str_sub(temp_sp, -2, -1) == "sp", paste0(temp_sp, "."), temp_sp)
+
+  otuCompl_Sum[, paste0(TargetSp, "_Summed")] <- rowSums(otuCompl_Sum[, which(colnames(otuCompl_Sum) %in% temp_sp)])
+}
+
+otuCompl_Sum$Porania_Summed <- rowSums(otuCompl_Sum[, which(colnames(otuCompl_Sum) %in% c("Porania_pulvillus", "Porania_sp."))])
+
+```
+
+
+```{r}
+Taxonary[Taxonary$Reference_List %in% c("Primnoa resedaeformis;impacted"), 'Analysis_name'] <- "Primnoa resedaeformis"
+Taxonary[Taxonary$Reference_List %in% c("Paragorgia arborea;impacted"), 'Analysis_name'] <- "Paragorgia arborea"
+
+Taxonary[Taxonary$Reference.List2 %in% c("Drifa_glomerata", "Duva_florida", "Duva_sp.", "Gersemia_rubiformis"), 'Analysis_name'] <- "Nephtheidae"
+
+FixThis <- c("Primnoa resedaeformis", "Paragorgia arborea", "Porifera brown papillae", "Nephtheidae")
+Taxonary$Reference.List3 <- gsub("[ ;]", "_", Taxonary$Reference_List)
+
+for (i in 1:length(FixThis)) {
+  From <- Taxonary[!is.na(Taxonary$Analysis_name) & Taxonary$Analysis_name %in% FixThis[i], 'Reference.List3']
+  To <- Taxonary[Taxonary$Reference_List == FixThis[i], 'Reference.List3']
+
+  if (any(colnames(otuCompl) %in% From)) {
+    if (any(colnames(otuCompl) %in% To)) {
+      otuCompl[, To] <- rowSums(otuCompl[, which(colnames(otuCompl) %in% c(To, From))])
+    }
+  }
+}
+
+```
+
+
+Grouping Additional Entries Based on Morphology/Color
+```{r}
+Taxonary[Taxonary$Reference_List %in% c("Primnoa resedaeformis;impacted"), 'Analysis_name'] <- "Primnoa resedaeformis"
+Taxonary[Taxonary$Reference_List %in% c("Paragorgia arborea;impacted"), 'Analysis_name'] <- "Paragorgia arborea"
+
+Taxonary[Taxonary$Reference.List2 %in% c("Drifa_glomerata", "Duva_florida", "Duva_sp.", "Gersemia_rubiformis"), 'Analysis_name'] <- "Nephtheidae"
+
+FixThis <- c("Primnoa resedaeformis", "Paragorgia arborea", "Porifera brown papillae", "Nephtheidae")
+Taxonary$Reference.List3 <- gsub("[ ;]", "_", Taxonary$Reference_List)
+
+for (i in 1:length(FixThis)) {
+  From <- Taxonary[!is.na(Taxonary$Analysis_name) & Taxonary$Analysis_name %in% FixThis[i], 'Reference.List3']
+  To <- Taxonary[Taxonary$Reference_List == FixThis[i], 'Reference.List3']
+
+  if (any(colnames(otuCompl) %in% From)) {
+    if (any(colnames(otuCompl) %in% To)) {
+      otuCompl[, To] <- rowSums(otuCompl[, which(colnames(otuCompl) %in% c(To, From))])
+    }
+  }
+}
+
+```
+
+
+Remove Unsummed Columns and Combine Dataframes
+```{r}
+# Summed taxonomic resolutions dataset
+tempdf <- otuCompl_Sum[, which(!(colnames(otuCompl_Sum) %in% colnames(otuCompl)))]
+colnames(tempdf) <- str_sub(colnames(tempdf), -str_length(colnames(tempdf)), -8)
+
+# Remove unsummed morphotypes from original dataset
+otuCompl <- otuCompl[, which(!(colnames(otuCompl) %in% c(colnames(tempdf), paste0(colnames(tempdf), "_sp."))))]
+
+# Combine datasets
+otuCompl <- cbind(otuCompl, tempdf)
+
+```
+
+
+Subset Data Based on Thresholds
+```{r}
+# Remove species with fewer occurrences than the threshold unless they are VMEs
+Sp_sel <- c(TRUE, colSums(otuCompl[, -1] > 0) > MinSightings)
+Sp_sel[which(names(Sp_sel) %in% ALL_vme)] <- TRUE
+
+# Retain stations with sufficient species counts
+stations_sel <- rowSums(otuCompl[, -1] > 0) > MinOTUs
+
+otuSel <- otuCompl[stations_sel, Sp_sel]
+envSel <- env_sort[stations_sel, ]
+
+envSel$swDensRob_avs <- swRho(
+  salinity = envSel$Smean_Robinson,
+  temperature = envSel$Tmean_Robinson,
+  pressure = (envSel$bathy * -1),
+  eos = "unesco"
+)
+
+#envSel <- envSel[, colSums(is.na(envSel)) == 0] # Remove environmental variables with NAs
+envSel$SampID <- as.factor(envSel$SampID)
+
+```
+
+
+
+Data Splitting and Initial Processing
+```{r}
+PointSizes<- 1
+
+ggplot()+
+  geom_point(data = env_orig[ env_orig$SampID %in% otuCompl[rowSums(otuCompl[, -c(1)]>0) <= MinOTUs,'SampID'],], aes(x_coord, y_coord, color = "Few otus"), size = PointSizes)+
+  geom_point(data = env_orig[rowSums(env_orig[,c('no_vision','poor_vision')], na.rm = TRUE) > 0.5,], aes(x_coord, y_coord, color = "Poor vision"), alpha = 0.5, size = PointSizes)+
+  geom_point(data = env_orig[env_orig$SegLength< length_lower,], aes(x_coord, y_coord, color = "Too short"), alpha = 0.5, size = PointSizes)+
+  geom_point(data = env_orig[env_orig$SegLength> length_upper,], aes(x_coord, y_coord, color = "Too long"), alpha = 0.5, size = PointSizes)+
+
+  geom_point(data = env_orig[env_orig$bathy > MinDepth,], aes(x_coord, y_coord, color = "Too shallow"), alpha = 0.5, size = PointSizes)+
+  geom_point(data = env_orig[env_orig$cruise_no  == "2006612" | (env_orig$cruise_no == "2019115" & env_orig$x_coord> 400000 & env_orig$y_coord>8500000),], aes(x_coord, y_coord, color = "2006 cruise \n& Kongfjord"), alpha = 0.5, size = PointSizes)+
+  geom_point(data = envSel_split[["All"]], aes(x_coord, y_coord, color = "Not excluded"), size = PointSizes)+
+    geom_map(data =  ggworldMap, map = ggworldMap, aes(long, lat, map_id = id), fill = "#ddb892", alpha = 0.4)+
+  theme_void()+
+  scale_color_manual(name='Stations excluded',
+                     breaks=c('Poor vision', 'Too short','Too long', 'Too shallow', '2006 cruise \n& Kongfjord','Not excluded', "Few otus"),
+                     values=c('Poor vision' = "#e9c46a", 'Too short' = "#e76f51", 'Too long' = "#9c89b8", 'Too shallow' = "#2a9d8f", '2006 cruise \n& Kongfjord' = "#ffddd2",'Not excluded' = "#caf0f8", 'Few otus' = "black"))+
+  coord_cartesian(xlim = range(env_orig$x_coord), ylim= range(env_orig$y_coord))
+
+```
+
+
+Environmental Variable Transformations and Covariation Check
+```{r}
+otu<-otuSel[,-which(colnames(otuSel) == "SampID")] #ncol(otuSel_split[[SPLIT]])
+env<-envSel
+
+# Apply transformations to environmental variables
+env <- env %>%
+  mutate(
+    log_bathy = log(-bathy),
+    log_msr5_mag = log(msr5_mag),
+    log_BO22_dissoxltmin_bdmean_n250 = log(BO22_dissoxltmin_bdmean - 250),
+    sqrt_BO22_carbonphytomean_bdmean = sqrt(BO22_carbonphytomean_bdmean),
+    Ice_PA = as.factor(ifelse(BO22_icethickmean_ss > 0, "ICE", "NoICE"))
+  )
+
+# Check for covariation in selected environmental variables
+ChosenEnvVar <- c(
+  "temp_mean", "temp_std", "salt_mean",
+  "log_bathy", "log_msr5_mag", "log_BO22_dissoxltmin_bdmean_n250"
+)
+pairs.panels(env[, ChosenEnvVar])
+
+```
+
+
+Taxonomy and Phylogenetic Tree
+```{r}
+# Standardize species names
+otu_sp <- ifelse(str_sub(colnames(otu), -3, -1) == "sp.", str_sub(colnames(otu), -str_length(colnames(otu)), -5), colnames(otu))
+otu_sp <- gsub("[.]", "_", otu_sp)
+
+
+Taxonomic_DF$Species <- ifelse(str_sub(Taxonomic_DF$Species, -3, -1) == "sp.", str_sub(Taxonomic_DF$Species, -str_length(Taxonomic_DF$Species), -5), Taxonomic_DF$Species)
+Taxonomic_DF$Species<-as.factor(Taxonomic_DF$Species)
+# Filter Taxonomic DataFrame
+Taxonomic_DF <- Taxonomic_DF[Taxonomic_DF$Species %in% otu_sp , ]
+
+# Create phylogenetic tree
+Taxonomic_phylo <- as.phylo(
+  ~Phylum/Subphylum/Superclass/Class/Subclass/Infraclass/Superorder/Order/Suborder/Infraorder/Superfamily/Family/Subfamily/Infrafamily/Genus/Species,
+  data = Taxonomic_DF[, 3:ncol(Taxonomic_DF)], collapse = FALSE
+)
+Taxonomic_phylo$edge.length <- rep(1, length(Taxonomic_phylo$edge))
+
+# Color tree branches
+Taxonomic_DF$class_colors<-NA
+for(i in 1:length(unique(Taxonomic_DF$Class))){
+  Taxonomic_DF$class_colors<-ifelse(Taxonomic_DF$Class ==  unique(Taxonomic_DF$Class)[i], 
+                                    c(polychrome(), alphabet2())[i], Taxonomic_DF$class_colors)
+}
+Branch_col <- data.frame(
+  Taxonomic_phylo$edge, Branch_col = NA, Taxa = NA
+)
+for(i in 1:length(Taxonomic_phylo$tip.label)){
+  if(i == 1){  
+    Branch_col[1:which(Branch_col[,2] == i),3]<-Taxonomic_DF[i,ncol(Taxonomic_DF)]
+    Branch_col[1:which(Branch_col[,2] == i),4]<-paste(Taxonomic_DF[i,"Class"])
+    next}
+  Branch_col[(which(Branch_col[,2] == (i-1))+1):which(Branch_col[,2] == i),3]<- Taxonomic_DF[Taxonomic_DF$Species == Taxonomic_phylo$tip.label[i], ncol(Taxonomic_DF)] # might need to change "Taxonomic_DF$Species" to "Taxonomic_DF$Subspecies" with the grab data
+  
+  Branch_col[(which(Branch_col[,2] == (i-1))+1):which(Branch_col[,2] == i),4]<- paste(Taxonomic_DF[Taxonomic_DF$Species == Taxonomic_phylo$tip.label[i], "Class"])
+}
+porifera_color<-Taxonomic_DF[Taxonomic_DF$Class == "Demospongiae",'class_colors'][1]
+Branch_col$Taxa<-ifelse(Branch_col$Taxa %in% Taxonomic_DF[Taxonomic_DF$Phylum == "Porifera", 'Class'], "Porifera", Branch_col$Taxa)
+Branch_col$Taxa<-ifelse(Branch_col$Taxa %in% Taxonomic_DF[Taxonomic_DF$Phylum == "Bryozoa", 'Class'], "Bryozoa", Branch_col$Taxa)
+
+Branch_col[Branch_col$Taxa == "Porifera", "Branch_col"]<-porifera_color
+
+# Plot the phylogenetic tree
+plot(Taxonomic_phylo, edge.color = Branch_col$Branch_col)
+legend("topleft",
+       legend = unique(Branch_col[,3:4])[,2], #Name of groups
+       col = unique(Branch_col[,3:4])[,1], # Color of the squares
+       cex =.6, #sets legend size
+       lwd=2, #sets line weight
+       xpd=TRUE) #places outside plot area
+
+```
+
+
+
+Save Outputs
+
+```{r}
+# Save data for further analysis
+otu$SampID <- env$SampID
+
+save(Taxonomic_phylo, file = paste0(PathOutput,"Taxonomic_phylo_",SPLIT,".rda"))
+save(Branch_col, file = paste0(PathOutput,"Branch_col_",SPLIT,".rda"))
+save(Taxonomic_DF, file = paste0(PathOutput,"Taxonomic_DF",SPLIT,".rda"))
+save(otu, file = paste0(PathOutput,"otu_Video_",SPLIT,".rda"))
+save(env, file =paste0(PathOutput,"env_Video_",SPLIT,".rda"))
+```
+
+```{r}
+# Prepare harvest effort data
+rHarvestEffort_df <- as.data.frame(rHarvestEffort$AllRelativeEffort, xy = TRUE) %>%
+  filter(!is.na(AllRelativeEffort))
+
+# Plot harvest effort
+ggplot() +
+  geom_tile(data = rHarvestEffort_df, aes(x = x, y = y, fill = round(AllRelativeEffort)), alpha = 0.8) +
+  scale_fill_gradientn(colors = c('white', '#4cc9f0', "#3a0ca3", "#f72585"), na.value = NA) +
+  geom_point(data = env, aes(x_coord, y_coord, color = Trawling), size = 5, alpha = 0.3) +
+  scale_color_gradientn(colors = c('white', '#ffff3f', "#80b918", "#43291f"), na.value = NA) +
+  theme_classic() +
+  coord_cartesian(xlim = c(-100000, 1300000), ylim = c(6500000, 9000000)) +
+  geom_map(data = ggworldMap, map = ggworldMap, aes(long, lat, map_id = id), fill = "#ddb892", alpha = 0.2)
+
+```
+
